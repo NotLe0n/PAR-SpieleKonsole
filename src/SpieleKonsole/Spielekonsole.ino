@@ -297,7 +297,7 @@ void playSnake() {
 	tft.fillRect(body[snakeLength - 1].X, body[snakeLength - 1].Y, HEAD_SIZE, HEAD_SIZE, ILI9341_BLACK);
 
 	// überprüfe ob essen im Kopf ist
-	if (aabb(head.X, head.Y, foodPos.X, foodPos.Y, HEAD_SIZE, HEAD_SIZE, FOODSIZE, FOODSIZE)) {
+	if (foodInsideSnake()) {
 		// verlängere die Schlange
 		snakeLength++;
 
@@ -414,9 +414,11 @@ void resetSnake() {
 
 // Überprüft ob essen innerhalb der Schlange ist
 bool foodInsideSnake() {
-	if (head == foodPos)
+	// ist das Essen im Kopf der Schlange?
+	if (head.X == (foodPos.X - 5) && head.Y == (foodPos.Y - 5)) // (foodPos.X - 5) weil foodPos am gitter zentriert ist
 		return true;
 
+	// ist das Essen im Körper der Schlange?
 	for (uint8_t i = 0; i < snakeLength; i++) {
 		if (body[i].X == (foodPos.X - 5) && body[i].Y == (foodPos.Y - 5)) {
 			return true;
@@ -455,15 +457,6 @@ void printCentered(const __FlashStringHelper* str, const int16_t& offsetX, const
 
 void setCursorRelative(const int16_t& x, const int8_t& y) {
 	tft.setCursor(tft.getCursorX() + x, tft.getCursorY() + y);
-}
-
-// AABB recteck zu rechteck collisions erkennung
-bool aabb(const uint16_t& x1, const uint8_t& y1, const uint16_t& x2, const uint8_t& y2,
-	const uint16_t& w1, const uint8_t& h1, const uint16_t& w2, const uint8_t& h2) {
-	return x1 < x2 + w2 &&
-		x1 + w1 > x2 &&
-		y1 < y2 + h2 &&
-		y1 + h1 > y2;
 }
 
 // gibt true zurück wenn 'elm' in 'arr' vorhanden ist
