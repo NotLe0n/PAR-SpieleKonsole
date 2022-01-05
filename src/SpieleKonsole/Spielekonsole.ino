@@ -2,7 +2,6 @@
 #include <Adafruit_ILI9341.h>
 #include <Adafruit_SPITFT.h>
 #include <SPI.h>
-#include "Input.h" // eigener header
 
 // Pins für den SchiebeRegister
 #define SR_DATA 2
@@ -14,11 +13,29 @@
 #define TFT_CS 10 // Chip select
 #define TFT_BL 9 // Backlight
 
+// LDR Pin
 #define LDR_PIN A0
+
+#pragma region InputHeaders
+#define INPUT_UP_PRESSED (inputData & B10000000)
+#define INPUT_DOWN_PRESSED (inputData & B01000000)
+#define INPUT_LEFT_PRESSED (inputData & B00100000)
+#define INPUT_RIGHT_PRESSED (inputData & B00010000)
+#define INPUT_A_PRESSED (inputData & B00001000)
+#define INPUT_B_PRESSED (inputData & B00000100)
+
+#define PREV_INPUT_UP_PRESSED (prevInputData & B10000000)
+#define PREV_INPUT_DOWN_PRESSED (prevInputData & B01000000)
+#define PREV_INPUT_LEFT_PRESSED (prevInputData & B00100000)
+#define PREV_INPUT_RIGHT_PRESSED (prevInputData & B00010000)
+#define PREV_INPUT_A_PRESSED (prevInputData & B00001000)
+#define PREV_INPUT_B_PRESSED (prevInputData & B00000100)
+#pragma endregion
 
 // Variable zur steuerung des TFT Displays
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC);
 
+// Eine Strukur zum speichern von Positionen mit einer X und Y koordinate
 struct position {
 	uint16_t X;
 	uint8_t Y;
@@ -93,7 +110,7 @@ void greeting() {
 	tft.setTextSize(1);
 	printCentered(F("Leon Gies"), 0, 20); // überladung mit offset
 
-	delay(4000);
+	delay(4000); // warte 4s
 	tft.fillScreen(ILI9341_BLACK);
 }
 
@@ -144,20 +161,22 @@ void handleInput() {
 uint8_t selectedGame = 0;
 uint8_t selectGame() {
 	if (INPUT_UP_PRESSED && !PREV_INPUT_UP_PRESSED) {
-		selectedGame--;
-		selectedGame %= 4;
+		selectedGame = uint8_t(--selectedGame) % 4; // verrigere den wert um 1. Halte den wert zwischen 0 und 4
 	}
 	if (INPUT_DOWN_PRESSED && !PREV_INPUT_DOWN_PRESSED) {
-		selectedGame = (selectedGame + 1) % 4;
+		selectedGame = ++selectedGame % 4; // erhöhe den wert um 1. Halte den wert zwischen 0 und 4. Wenn der wert 5 ist wird er zu 0 gesetzt
 	}
 
+	// Alle Spiele
 	const String spiele[] = { "Snake", "Pong", "Minesweeper", "Tic Tac Toe" };
 
+	// schreibe "Spieleliste"
 	tft.setCursor(0, 0);
 	tft.setTextSize(3);
 	tft.setTextColor(ILI9341_YELLOW);
 	tft.println(F("Spieleliste"));
 
+	// schreibe alle Spiele
 	tft.setTextSize(2);
 	setCursorRelative(0, 10);
 
@@ -170,6 +189,7 @@ uint8_t selectGame() {
 		tft.println(spiele[i]);
 	}
 
+	// Wenn 'A' gedrückt wurde
 	if (INPUT_A_PRESSED) {
 		inGame = true;
 
@@ -191,6 +211,7 @@ void setupGame(const uint8_t game) {
 	switch (game)
 	{
 	case gameID::SNAKE:
+		// generiere neues essen an einer Zufälligen stelle
 		foodPos.X = genRandPointCenteredOnGrid(HEAD_SIZE, 10, 310);
 		foodPos.Y = genRandPointCenteredOnGrid(HEAD_SIZE, 20, 230);
 		tft.fillRect(foodPos.X, foodPos.Y, FOODSIZE, FOODSIZE, ILI9341_RED); // zeiche essen
@@ -237,10 +258,13 @@ void playGame(const uint8_t game) {
 	}
 }
 
+#pragma region Snake
+
 #define MAX_SNAKE_LENGTH 100
+#define SNAKE_SPEED 180
 position head = position(0, 20);
 position body[MAX_SNAKE_LENGTH];
-uint8_t length;
+uint8_t snakeLength;
 
 enum snakeDirection : uint8_t 
 {
@@ -250,6 +274,7 @@ uint8_t direction = 3;
 
 void playSnake() {
 	// eingabe
+	// Die Schlange darf keine 180° Umdrehung machen
 	if (INPUT_UP_PRESSED && direction != DOWN) {
 		direction = UP;
 	}
@@ -263,13 +288,18 @@ void playSnake() {
 		direction = RIGHT;
 	}
 
+	// takt abstand
+	// kein delay() weil sonst Eingaben überspringen werden können
+	if (millis() % SNAKE_SPEED != 0)
+		return;
+
 	// entferne das letzte Körpersegment vom Display
-	tft.fillRect(body[length - 1].X, body[length - 1].Y, HEAD_SIZE, HEAD_SIZE, ILI9341_BLACK);
+	tft.fillRect(body[snakeLength - 1].X, body[snakeLength - 1].Y, HEAD_SIZE, HEAD_SIZE, ILI9341_BLACK);
 
 	// überprüfe ob essen im Kopf ist
 	if (aabb(head.X, head.Y, foodPos.X, foodPos.Y, HEAD_SIZE, HEAD_SIZE, FOODSIZE, FOODSIZE)) {
 		// verlängere die Schlange
-		length++;
+		snakeLength++;
 
 		// generiere neues essen an einer Zufälligen stelle, die nicht innerhalb der Schlange ist
 		do {
@@ -281,16 +311,18 @@ void playSnake() {
 
 		// zeichne den neuen Punktestand
 		tft.setCursor(100, 0);
-		tft.println(length * 100);
+		tft.println(snakeLength * 100);
 	}
 
 	// körper position ändern
-	for (int i = length - 1; i >= 0; i--)
+	for (int i = snakeLength - 1; i >= 0; i--)
 	{
 		if (i == 0) {
+			// das erste Körper segment wird an die Stelle des Kopfes bewegt
 			body[i] = head;
 		}
 		else {
+			// Alle anderen segmente bewegen sich an die Stelle ihres vorderen
 			body[i] = body[i - 1];
 		}
 	}
@@ -316,73 +348,84 @@ void playSnake() {
 	}
 
 	// screenwrap
-	if (head.X == 65536 - HEAD_SIZE) { // 65536 = 16 bit maximaler wert; nicht head.X < 0 weil X ein unsigned wert ist
+	// 65536 = 16 bit maximaler wert; nicht head.X < 0 weil X ein unsigned wert ist und X zu dem maximalen wert underflowed
+	if (head.X == 65536 - HEAD_SIZE) { // linker rand
 		head.X = tft.width() - HEAD_SIZE;
 	}
-	if (head.X >= tft.width()) {
+	if (head.X >= tft.width()) {  // rechter Rand
 		head.X = 0;
 	}
-	if (head.Y < 20) {
-		head.Y = tft.height() - HEAD_SIZE;
+	if (head.Y < 20) { // oberer Rand
+		head.Y = tft.height() - HEAD_SIZE; 
 	}
-	if (head.Y >= tft.height()) {
+	if (head.Y >= tft.height()) { // unterer Rand
 		head.Y = 20;
 	}
 	
+	// Kopf neu zeichnen
 	tft.fillRect(oldHead.X, oldHead.Y, HEAD_SIZE, HEAD_SIZE, ILI9341_BLACK);
 	tft.fillRect(head.X, head.Y, HEAD_SIZE, HEAD_SIZE, ILI9341_DARKGREEN);
 
-	if (length > 0) {
+	// Erste Körper stelle Zeichnen
+	if (snakeLength > 0) {
 		tft.fillRect(body[0].X, body[0].Y, HEAD_SIZE, HEAD_SIZE, ILI9341_GREEN);
 	}
 
 	// Man hat verloren wenn sich der Kopf mit dem Körper trifft
-	if (length > 0 && posarr_contains(body, length, head)) {
+	if (snakeLength > 0 && posarr_contains(body, snakeLength, head)) {
 		resetSnake();
+
+		tft.setTextColor(ILI9341_WHITE);
 		printCentered(F("Verloren :("));
+
 		delay(2000);
 		zumHauptmenu();
 	}
 
 	// Das Spiel endet wenn man 10000 punkte erreicht hat
-	if (length == 100) {
+	if (snakeLength == 100) {
 		resetSnake();
+
+		tft.setTextColor(ILI9341_WHITE);
 		printCentered(F("GEWONNEN"));
+
 		delay(2000);
 		zumHauptmenu();
 	}
-
-	delay(100);
 }
 
 // Erzeugt einen Punkt an einer Zufälligen position in der mitte einer Zelle
 uint16_t genRandPointCenteredOnGrid(const uint16_t& cellSize, const uint16_t& min, const uint16_t& max) {
-	uint16_t pos = random(min, max);
-	return (pos / cellSize) * cellSize + cellSize / 4;
+	uint16_t pos = random(min, max); // zufällige position erzeugen
+	return (pos / cellSize) * cellSize + cellSize / 4; // zentrieren und zurückgeben
 }
 
+// setzt alle Variablen zu ihrem Standartwert
 void resetSnake() {
 	foodPos = {};
-	length = 0;
+	snakeLength = 0;
 	head = { 0, 20 };
 	direction = 3;
-	for (uint8_t i = 0; i < length; i++)
+	for (uint8_t i = 0; i < snakeLength; i++)
 	{
 		body[i] = {};
 	}
 }
 
+// Überprüft ob essen innerhalb der Schlange ist
 bool foodInsideSnake() {
 	if (head == foodPos)
 		return true;
 
-	for (uint8_t i = 0; i < length; i++) {
+	for (uint8_t i = 0; i < snakeLength; i++) {
 		if (body[i].X == (foodPos.X - 5) && body[i].Y == (foodPos.Y - 5)) {
 			return true;
 		}
 	}
 	return false;
 }
+
+#pragma endregion
 
 void playPong() {
 }
@@ -397,7 +440,7 @@ void printCentered(const __FlashStringHelper* str) {
 	int16_t boundsX, boundsY;
 	uint16_t boundsW, boundsH;
 	tft.getTextBounds(str, tft.width() / 2, tft.height()  / 2, &boundsX, &boundsY, &boundsW, &boundsH);
-	tft.setCursor((tft.width() - boundsW) / 2, tft.height() / 2);
+	tft.setCursor((tft.width() - boundsW) / 2, (tft.height() - boundsH) / 2);
 	tft.print(str);
 }
 
@@ -406,7 +449,7 @@ void printCentered(const __FlashStringHelper* str, const int16_t& offsetX, const
 	int16_t boundsX, boundsY;
 	uint16_t boundsW, boundsH;
 	tft.getTextBounds(str, tft.width() / 2, tft.height() / 2, &boundsX, &boundsY, &boundsW, &boundsH);
-	tft.setCursor((tft.width() - boundsW) / 2 + offsetX, tft.height() / 2 + offsetY);
+	tft.setCursor((tft.width() - boundsW) / 2 + offsetX, (tft.height() - boundsH) / 2 + offsetY);
 	tft.print(str);
 }
 
@@ -423,6 +466,7 @@ bool aabb(const uint16_t& x1, const uint8_t& y1, const uint16_t& x2, const uint8
 		y1 + h1 > y2;
 }
 
+// gibt true zurück wenn 'elm' in 'arr' vorhanden ist
 bool posarr_contains(position arr[], const uint8_t size, const position& elm) {
 	for (uint8_t i = 0; i < size; i++) {
 		if (arr[i] == elm) {
@@ -432,6 +476,7 @@ bool posarr_contains(position arr[], const uint8_t size, const position& elm) {
 	return false;
 }
 
+// Springt zurück zum Spiel Auswahl menü
 void zumHauptmenu() {
 	tft.fillScreen(ILI9341_BLACK);
 	inGame = false;

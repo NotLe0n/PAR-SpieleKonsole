@@ -15,16 +15,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Spielekonsole.ino" />
+    <None Include="SpieleKonsole.ino" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="__vm\.Spielekonsole.vsarduino.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="__vm\.PAR-SpieleKonsole.vsarduino.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Input.h">
+    <ClInclude Include="__vm\.SpieleKonsole.vsarduino.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
