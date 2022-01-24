@@ -78,7 +78,7 @@ void setup() {
 	analogWrite(TFT_BL, 255); // Bildschirm anschalten
 
 	// Begrüßungsnachricht
-#define SKIPGREETING true // Debug variable um die Begrüßungsnachricht zu überspringen
+#define SKIPGREETING false // Debug variable um die Begrüßungsnachricht zu überspringen
 #if !SKIPGREETING
 	greeting();
 #endif
