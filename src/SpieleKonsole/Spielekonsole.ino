@@ -4,9 +4,9 @@
 #include <SPI.h>
 
 // Pins für den SchiebeRegister
-#define SR_DATA 2
-#define SR_LATCH 3
-#define SR_CLOCK 4
+#define SR_DATA 3
+#define SR_LATCH 4
+#define SR_CLOCK 5
 
 // Pins für den TFT Display
 #define TFT_DC 8 // SPI Data
@@ -16,21 +16,24 @@
 // LDR Pin
 #define LDR_PIN A0
 
+// Interrupt Pin
+#define INT_PIN 2
+
 #pragma region InputDefines
 #define INPUT_CHANGED (prevInputData != inputData)
-#define INPUT_UP_PRESSED (inputData & 0b10000000)
-#define INPUT_DOWN_PRESSED (inputData & 0b01000000)
-#define INPUT_LEFT_PRESSED (inputData & 0b00100000)
-#define INPUT_RIGHT_PRESSED (inputData & 0b00010000)
-#define INPUT_A_PRESSED (inputData & 0b00001000)
-#define INPUT_B_PRESSED (inputData & 0b00000100)
+#define INPUT_UP_PRESSED (inputData & 0b00000001)
+#define INPUT_DOWN_PRESSED (inputData & 0b00000010)
+#define INPUT_LEFT_PRESSED (inputData & 0b00000100)
+#define INPUT_RIGHT_PRESSED (inputData & 0b00001000)
+#define INPUT_A_PRESSED (inputData & 0b00010000)
+#define INPUT_B_PRESSED (inputData & 0b00100000)
 
-#define PREV_INPUT_UP_PRESSED (prevInputData & 0b10000000)
-#define PREV_INPUT_DOWN_PRESSED (prevInputData & 0b01000000)
-#define PREV_INPUT_LEFT_PRESSED (prevInputData & 0b00100000)
-#define PREV_INPUT_RIGHT_PRESSED (prevInputData & 0b00010000)
-#define PREV_INPUT_A_PRESSED (prevInputData & 0b00001000)
-#define PREV_INPUT_B_PRESSED (prevInputData & 0b00000100)
+#define PREV_INPUT_UP_PRESSED (prevInputData & 0b00000001)
+#define PREV_INPUT_DOWN_PRESSED (prevInputData & 0b00000010)
+#define PREV_INPUT_LEFT_PRESSED (prevInputData & 0b00000100)
+#define PREV_INPUT_RIGHT_PRESSED (prevInputData & 0b00001000)
+#define PREV_INPUT_A_PRESSED (prevInputData & 0b00010000)
+#define PREV_INPUT_B_PRESSED (prevInputData & 0b00100000)
 #pragma endregion
 
 // Variable zur steuerung des TFT Displays
@@ -82,6 +85,9 @@ void setup() {
 #if !SKIPGREETING
 	greeting();
 #endif
+
+	// Interrupt auf den Pin festlegen
+	attachInterrupt(digitalPinToInterrupt(INT_PIN), zumHauptmenu, FALLING);
 }
 
 bool inGame = false;
@@ -149,7 +155,7 @@ void handleInput() {
 
 		if (wert) {
 			// schiebe die eins so tief je nach dem welcher taster gedrückt wurde
-			uint8_t schiebeBit = (B0000001 << j);
+			uint8_t schiebeBit = (B00000001 << j);
 			// Kombiniere die verschobene eins mit dataIn
 			inputData |= schiebeBit;
 		}
@@ -194,7 +200,7 @@ uint8_t selectGame() {
 	}
 
 	// Wenn 'A' gedrückt wurde
-	if (INPUT_A_PRESSED) {
+	if (INPUT_A_PRESSED || INPUT_B_PRESSED) {
 		inGame = true;
 
 		tft.fillScreen(ILI9341_BLACK); // Bildschirm schwarz machen
@@ -446,8 +452,8 @@ uint8_t P_paddle2Y; // Y Koordinate vom 2. Schläger
 
 void setupPong() {
 	P_ballPos = { ILI9341_TFTHEIGHT / 2, ILI9341_TFTWIDTH / 2 };
-	P_ballVelocityX = 1;
-	P_ballVelocityY = -1;
+	P_ballVelocityX = random(-1, 1) ? 1 : -1; // 50% chance dass es eine -1 ist
+	P_ballVelocityY = random(-1, 1) ? 1 : -1; // 50% chance dass es eine -1 ist
 	P_paddle1Y = 80;
 	P_paddle2Y = 80;
 
@@ -509,7 +515,7 @@ void P_movePaddle2(uint8_t amount) {
 
 	P_paddle2Y += amount; // schläger bewegen
 	// falls schläger außerhalb des Bildschirmes ist, ihn wieder zurück bewegen
-	if (P_paddle2Y == 0 || P_paddle1Y == tft.height() - P_paddleHeight)
+	if (P_paddle2Y == 0 || P_paddle2Y == tft.height() - P_paddleHeight)
 		P_paddle2Y -= amount;
 
 	tft.drawRect(tft.width() - P_paddleWidth - 10, P_paddle2Y, P_paddleWidth, P_paddleHeight, ILI9341_BLUE); // schläger wieder neu zeichnen
@@ -526,9 +532,15 @@ void P_moveBall() {
 		P_ballVelocityY = -P_ballVelocityY; // spiegle die Y geschwindigkeit
 	}
 
-	// hitPaddle2 funktioniert noch nicht richtig
-	const bool hitPaddle1 = P_ballPos.X <= 10 + P_paddleWidth && (P_ballPos.Y >= P_paddle1Y && P_ballPos.Y + P_ballSize <= P_paddle1Y + P_paddleHeight);
-	const bool hitPaddle2 = (P_ballPos.X + P_ballSize >= tft.width() - P_paddleWidth - 10 - 1) && (P_ballPos.Y >= P_paddle2Y && P_ballPos.Y + P_ballSize <= P_paddle2Y + P_paddleHeight);
+	// wenn der linke Rand des Balls hinter dem Schläger ist und der Ball zwischen dem oberen und unteren Rand des Schlägers ist, wurde der 2. Schläger getroffen
+	const bool hitPaddle1 = 
+		P_ballPos.X <= 10 + P_paddleWidth && 
+		(P_ballPos.Y + P_ballSize >= P_paddle1Y && P_ballPos.Y <= P_paddle1Y + P_paddleHeight);
+
+	// wenn der rechte Rand des Balls hinter dem Rechten schläger ist und der Ball zwischen dem oberen und unteren Rand des Schlägers ist, wurde der 2. Schläger getroffen
+	const bool hitPaddle2 =
+		(P_ballPos.X + P_ballSize >= tft.width() - P_paddleWidth - 10 - 1) &&
+		(P_ballPos.Y + P_ballSize >= P_paddle2Y && P_ballPos.Y <= P_paddle2Y + P_paddleHeight);
 
 	// wenn der ball einer der Schläger trifft
 	if (hitPaddle1 || hitPaddle2)
