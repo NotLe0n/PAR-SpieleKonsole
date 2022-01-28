@@ -81,7 +81,7 @@ void setup() {
 	analogWrite(TFT_BL, 255); // Bildschirm anschalten
 
 	// Begrüßungsnachricht
-#define SKIPGREETING false // Debug variable um die Begrüßungsnachricht zu überspringen
+#define SKIPGREETING true // Debug variable um die Begrüßungsnachricht zu überspringen
 #if !SKIPGREETING
 	greeting();
 #endif
@@ -446,9 +446,11 @@ int8_t P_ballVelocityX; // Horizontale geschwindigkeit/richtung vom Ball
 int8_t P_ballVelocityY; // Vertikale geschwindigkeit/richtung vom Ball
 uint8_t P_paddle1Y; // Y Koordinate vom 1. Schläger
 uint8_t P_paddle2Y; // Y Koordinate vom 2. Schläger
-#define P_paddleHeight 80 // Länge der Schläger
-#define P_paddleWidth 20 // Breite der Schläger
+uint8_t P_points; // Zehner stelle = spieler1, Einser Stelle = spieler2 :: Beispiel: 12 = 1 : 2
+#define P_paddleHeight 40 // Länge der Schläger
+#define P_paddleWidth 5 // Breite der Schläger
 #define P_ballSize 10 // Größe vom Ball
+#define P_maxPoints 3 // maximale anzahl an punken
 
 void setupPong() {
 	P_ballPos = { ILI9341_TFTHEIGHT / 2, ILI9341_TFTWIDTH / 2 };
@@ -456,17 +458,28 @@ void setupPong() {
 	P_ballVelocityY = random(-1, 1) ? 1 : -1; // 50% chance dass es eine -1 ist
 	P_paddle1Y = 80;
 	P_paddle2Y = 80;
+	P_points = 00;
 
 	// Zeichne Schläger und den Ball
 	tft.drawRect(10, P_paddle1Y, P_paddleWidth, P_paddleHeight, ILI9341_RED);
 	tft.drawRect(tft.width() - P_paddleWidth - 10, P_paddle2Y, P_paddleWidth, P_paddleHeight, ILI9341_BLUE);
 	tft.fillRect(P_ballPos.X, P_ballPos.Y, P_ballSize, P_ballSize, ILI9341_WHITE);
+
+	// punkestand einstellungen
+	tft.setTextWrap(false);
+	tft.setTextSize(4);
+	tft.setTextColor(ILI9341_WHITE, ILI9341_BLACK);
 }
 
 void playPong() {
+	tft.setCursor(100, 0);
+	tft.print(P_points / 10); // durch 10 um die Zehnerstelle zu bekommen
+	tft.print(F(" : "));
+	tft.print(P_points % 10); // modulo 10 um die Einserstelle zu bekommen
+
 	// HOCH und UNTEN bewegen den 1. Schläger
 	if (INPUT_UP_PRESSED) {
-		P_movePaddle1(-1);		
+		P_movePaddle1(-1);
 	}
 	if (INPUT_DOWN_PRESSED) {
 		P_movePaddle1(1);
@@ -481,50 +494,69 @@ void playPong() {
 	}
 
 	P_moveBall(); // bewege und zeichne den Ball
-	
-	// falls der schläger am rand ankommt, soll das Spiel beendet werden
-	if (P_ballPos.X < 5) {
-		printCentered(F("Spieler 2 hat gewonnen!"));
 
-		delay(1000);
-		zumHauptmenu();
+	// falls der schläger am rand ankommt, bekommt der Spieler auf der anderen seite einen punkt
+	if (P_ballPos.X < 5) {
+		P_points++;
+
+		// bei drei punkten wird das Spiel beendet
+		if (P_points % 10 == P_maxPoints) {
+			tft.setTextSize(2);
+			printCentered(F("Spieler 1 hat gewonnen!"));
+
+			delay(1000);
+			zumHauptmenu();
+			return;
+		}
+
+		P_reset();
 	}
 	if (P_ballPos.X > tft.width() - 5 - P_ballSize) {
-		printCentered(F("Spieler 1 hat gewonnen!"));
+		P_points += 10;
 
-		delay(1000);
-		zumHauptmenu();
+		// bei drei punkten wird das Spiel beendet
+		if (P_points / 10 == P_maxPoints) {
+			tft.setTextSize(2);
+			printCentered(F("Spieler 2 hat gewonnen!"));
+
+			delay(1000);
+			zumHauptmenu();
+			return;
+		}
+
+		P_reset();
 	}
 }
 
 // ändert die Y position des 1. Schlägers um den gegebenen Wert
 void P_movePaddle1(uint8_t amount) {
+	// falls schläger außerhalb des Bildschirmes geht, nicht bewegen
+	if (P_paddle1Y + amount == 255 || P_paddle1Y + amount == tft.height() - P_paddleHeight) {
+		return;
+	}
+
 	tft.drawRect(10, P_paddle1Y, P_paddleWidth, P_paddleHeight, ILI9341_BLACK); // schläger vom Display entfernen
 
 	P_paddle1Y += amount; // schläger bewegen
-	// falls schläger außerhalb des Bildschirmes ist, ihn wieder zurück bewegen
-	if (P_paddle1Y == 0 || P_paddle1Y == tft.height() - P_paddleHeight)
-		P_paddle1Y -= amount;
 
 	tft.drawRect(10, P_paddle1Y, P_paddleWidth, P_paddleHeight, ILI9341_RED); // schläger wieder neu zeichnen
 }
 
 // ändert die Y Position des 2. Schlägers um den gegebenen Wert
 void P_movePaddle2(uint8_t amount) {
+	// falls schläger außerhalb des Bildschirmes ist, nicht bewegen
+	if (P_paddle2Y + amount == 255 || P_paddle2Y + amount == tft.height() - P_paddleHeight) {
+		return;
+	}
+
 	tft.drawRect(tft.width() - P_paddleWidth - 10, P_paddle2Y, P_paddleWidth, P_paddleHeight, ILI9341_BLACK);
 
 	P_paddle2Y += amount; // schläger bewegen
-	// falls schläger außerhalb des Bildschirmes ist, ihn wieder zurück bewegen
-	if (P_paddle2Y == 0 || P_paddle2Y == tft.height() - P_paddleHeight)
-		P_paddle2Y -= amount;
 
 	tft.drawRect(tft.width() - P_paddleWidth - 10, P_paddle2Y, P_paddleWidth, P_paddleHeight, ILI9341_BLUE); // schläger wieder neu zeichnen
 }
 
 void P_moveBall() {
-	if (millis() % 40 != 0)
-		return;
-
 	tft.fillRect(P_ballPos.X, P_ballPos.Y, P_ballSize, P_ballSize, ILI9341_BLACK); // ball vom Display entfernen
 
 	// wenn der ball den oberen oder den unteren rand trifft
@@ -543,8 +575,13 @@ void P_moveBall() {
 		(P_ballPos.Y + P_ballSize >= P_paddle2Y && P_ballPos.Y <= P_paddle2Y + P_paddleHeight);
 
 	// wenn der ball einer der Schläger trifft
-	if (hitPaddle1 || hitPaddle2)
+	if (hitPaddle1)
 	{
+		P_ballPos.X = 10 + P_paddleWidth; // setze die Position zum rechten rand des 1. Schlägers, sodass der Ball nicht stecken bleibt
+		P_ballVelocityX = -P_ballVelocityX; // spiegle die X geschwindigkeit
+	}
+	if (hitPaddle2) {
+		P_ballPos.X = tft.width() - P_paddleWidth - 10 - P_ballSize - 1; // setze die Position zum linken rand des 2. Schlägers, sodass der Ball nicht stecken bleibt
 		P_ballVelocityX = -P_ballVelocityX; // spiegle die X geschwindigkeit
 	}
 
@@ -553,6 +590,20 @@ void P_moveBall() {
 	P_ballPos.Y += P_ballVelocityY;
 
 	tft.fillRect(P_ballPos.X, P_ballPos.Y, P_ballSize, P_ballSize, ILI9341_WHITE); // ball neu zeichnen
+}
+
+void P_reset() {
+	tft.fillScreen(ILI9341_BLACK);
+
+	P_ballPos = { ILI9341_TFTHEIGHT / 2, ILI9341_TFTWIDTH / 2 };
+	P_ballVelocityX = random(-1, 1) ? 1 : -1; // 50% chance dass es eine -1 ist
+	P_ballVelocityY = random(-1, 1) ? 1 : -1; // 50% chance dass es eine -1 ist
+	P_paddle1Y = 80;
+	P_paddle2Y = 80;
+
+	tft.drawRect(10, P_paddle1Y, P_paddleWidth, P_paddleHeight, ILI9341_RED);
+	tft.drawRect(tft.width() - P_paddleWidth - 10, P_paddle2Y, P_paddleWidth, P_paddleHeight, ILI9341_BLUE);
+	tft.fillRect(P_ballPos.X, P_ballPos.Y, P_ballSize, P_ballSize, ILI9341_WHITE);
 }
 
 #pragma endregion
@@ -574,7 +625,7 @@ cell cells[MS_FIELD_SIZE * MS_FIELD_SIZE]; // Minesweeper Zellen
 bool firstClick;
 uint8_t MS_cursorPosX; // X Position vom Minesweeper Cursor
 uint8_t MS_cursorPosY; // Y Position vom Minesweeper Cursor
-#define MS_MINECOUNT 8
+#define MS_MINECOUNT 16
 
 void setupMinesweeper() {
 	firstClick = true;
@@ -659,14 +710,8 @@ void playMinesweeper() {
 		}
 
 		if (!(cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)] & CELLSTATE_REVEALED)) {
-			//Serial.print("Revealing: ");
-			//Serial.print(MS_cursorPosX);
-			//Serial.print(", ");
-			//Serial.println(MS_cursorPosY);
-
 			cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)] |= CELLSTATE_REVEALED;
 			revealNeighbors(MS_cursorPosX, MS_cursorPosY);
-			Serial.println("NEIGHBORS IN PARIS HAVE BEEN REVEALED");
 		}
 
 		firstClick = false;
@@ -706,44 +751,27 @@ void generateField() {
 	} while (countNearbyMines(MS_cursorPosX, MS_cursorPosY) != 0); // erstelle solange ein neues feld bis die Zelle an der position des Zeigers frei ist
 }
 
-// Ganz viele Debug Kommentare weil der Arduino hier Abstürzt
+
 // Zeigt Rekursiv alle Nachbarn einer Zelle
 void revealNeighbors(const uint8_t& posX, const uint8_t& posY) {
-	//Serial.println(RAMEND - SP);
+	Serial.print(RAMEND - SP);
+	Serial.print(", ");
+
 	// zeige alle Zellen direkt neben der Zelle
 	for (int8_t x = -1; x <= 1; x++) {
 		for (int8_t y = -1; y <= 1; y++) {
 			// überspringe wenn die Koordinate außerhalb des Feldes ist.
 			if (posX + x < 0 || posY + y < 0 || posX + x > MS_FIELD_SIZE - 1 || posY + y > MS_FIELD_SIZE - 1)
 				continue;
-			//Serial.println("creating neigbor Var");
-			const cell neighbor = cells[MS_getIndex(posX + x, posY + y)];
-			//Serial.println("checking recursion condition");
+
 			// Zeige keine Mienen und die eigene Zelle
-			if ((neighbor & CELLSTATE_MINE) != 0 || (neighbor & CELLSTATE_REVEALED) != 0 || (x == 0 && y == 0))
+			if ((cells[MS_getIndex(posX + x, posY + y)] & CELLSTATE_MINE) != 0 || (cells[MS_getIndex(posX + x, posY + y)] & CELLSTATE_REVEALED) != 0 || (x == 0 && y == 0))
 				continue;
 			
-			//Serial.println("counting mines");
 			if (countNearbyMines(posX, posY) == 0)
 			{
-				//Serial.println("setting new state");
-				cells[MS_getIndex(posX + x, posY + y)] |= CELLSTATE_REVEALED;
-				//MineSweeper_drawCell(cells[MS_getIndex(posX + x, posY + y)], posX + x, posY + y);
-				//delay(50);
-				//Serial.println("doing recursion");
-				revealNeighbors(posX + x, posY + y); // recursion funny
-				//Serial.println("recursion finished");
-				/*
-				Serial.print("X: ");
-				Serial.print(posX);
-				Serial.print(", Y: ");
-				Serial.print(posY);
-				Serial.print(";+X: ");
-				Serial.print(x);
-				Serial.print(";+Y: ");
-				Serial.print(y);
-				Serial.println();
-				*/
+				cells[MS_getIndex(posX + x, posY + y)] |= CELLSTATE_REVEALED;;
+				revealNeighbors(posX + x, posY + y); // rekursion
 				
 			}
 		}
@@ -779,7 +807,6 @@ void drawCells() {
 	}
 }
 
-// crash hier??
 // Zeichnet eine zelle
 void MineSweeper_drawCell(const uint8_t& cl, const uint8_t& x, const uint8_t& y) {
 	if (cl & CELLSTATE_REVEALED) {
@@ -824,6 +851,8 @@ bool MS_checkWin() {
 
 #define TTT_getIndex(x, y) ((x) + 3 * (y))
 #define TTT_fieldSize 50
+#define TTT_offsetX 80
+#define TTT_offsetY 40
 uint8_t TTT_cursorX;
 uint8_t TTT_cursorY;
 uint8_t tictactoeField[9] = { 0 }; // 0 = nicht angekreuzt, 1 = X, 2 = O
@@ -871,7 +900,7 @@ void playTicTacToe() {
 
 	if (INPUT_CHANGED) {
 		drawTTTField(); // zeichne das feld
-		tft.drawRect(TTT_cursorX * TTT_fieldSize, TTT_cursorY * TTT_fieldSize, TTT_fieldSize, TTT_fieldSize, ILI9341_BLUE); // zeichne den cursor
+		tft.drawRect(TTT_cursorX * TTT_fieldSize + TTT_offsetX, TTT_cursorY * TTT_fieldSize + TTT_offsetY, TTT_fieldSize, TTT_fieldSize, ILI9341_BLUE); // zeichne den cursor
 
 		// überprüfe ob das Spiel beendet werden soll
 		if (TTT_checkWin() == 1) { // wenn Spieler 1 (X) gewonnen hat
@@ -907,19 +936,19 @@ void drawTTTField() {
 		for (uint8_t x = 0; x < 3; x++)
 		{
 			if (tictactoeField[TTT_getIndex(x, y)] == 1) {
-				tft.setCursor(x * TTT_fieldSize + 15, y * TTT_fieldSize + 12);
+				tft.setCursor(x * TTT_fieldSize + 15 + TTT_offsetX, y * TTT_fieldSize + 12 + TTT_offsetY);
 				tft.setTextColor(ILI9341_RED, ILI9341_BLACK);
 				tft.setTextSize(4);
 				tft.print('X');
 			}
 			else if (tictactoeField[TTT_getIndex(x, y)] == 2) {
-				tft.setCursor(x * TTT_fieldSize + 15, y * TTT_fieldSize + 12);
+				tft.setCursor(x * TTT_fieldSize + 15 + TTT_offsetX, y * TTT_fieldSize + 12 + TTT_offsetY);
 				tft.setTextColor(ILI9341_BLUE, ILI9341_BLACK);
 				tft.setTextSize(4);
 				tft.print('O');
 			}
 
-			tft.drawRect(TTT_fieldSize * x, TTT_fieldSize * y, TTT_fieldSize, TTT_fieldSize, ILI9341_WHITE);
+			tft.drawRect(TTT_fieldSize * x + TTT_offsetX, TTT_fieldSize * y + TTT_offsetY, TTT_fieldSize, TTT_fieldSize, ILI9341_WHITE);
 		}
 	}
 }
