@@ -472,10 +472,8 @@ void setupPong() {
 }
 
 void playPong() {
-	tft.setCursor(100, 0);
-	tft.print(P_points / 10); // durch 10 um die Zehnerstelle zu bekommen
-	tft.print(F(" : "));
-	tft.print(P_points % 10); // modulo 10 um die Einserstelle zu bekommen
+	if (millis() % 10 != 0)
+		return;
 
 	// HOCH und UNTEN bewegen den 1. Schläger
 	if (INPUT_UP_PRESSED) {
@@ -600,6 +598,15 @@ void P_reset() {
 	P_ballVelocityY = random(-1, 1) ? 1 : -1; // 50% chance dass es eine -1 ist
 	P_paddle1Y = 80;
 	P_paddle2Y = 80;
+
+	tft.setCursor(100, 100);
+	tft.setTextSize(4);
+	tft.print(P_points / 10);
+	tft.print( + " : ");
+	tft.print(P_points % 10);
+
+	delay(500);
+	tft.fillScreen(ILI9341_BLACK);
 
 	tft.drawRect(10, P_paddle1Y, P_paddleWidth, P_paddleHeight, ILI9341_RED);
 	tft.drawRect(tft.width() - P_paddleWidth - 10, P_paddle2Y, P_paddleWidth, P_paddleHeight, ILI9341_BLUE);
