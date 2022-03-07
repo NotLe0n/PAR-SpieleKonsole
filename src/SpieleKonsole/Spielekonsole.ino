@@ -4,8 +4,8 @@
 #include <SPI.h>
 
 // Pins für den SchiebeRegister
-#define SR_DATA 3
-#define SR_LATCH 4
+#define SR_LATCH 3
+#define SR_DATA 4
 #define SR_CLOCK 5
 
 // Pins für den TFT Display
@@ -21,16 +21,16 @@
 
 #pragma region InputDefines
 #define INPUT_CHANGED (prevInputData != inputData)
-#define INPUT_UP_PRESSED (inputData & 0b00000001)
+#define INPUT_UP_PRESSED (inputData & 0b00000100)
 #define INPUT_DOWN_PRESSED (inputData & 0b00000010)
-#define INPUT_LEFT_PRESSED (inputData & 0b00000100)
+#define INPUT_LEFT_PRESSED (inputData & 0b00000001)
 #define INPUT_RIGHT_PRESSED (inputData & 0b00001000)
 #define INPUT_A_PRESSED (inputData & 0b00010000)
 #define INPUT_B_PRESSED (inputData & 0b00100000)
 
-#define PREV_INPUT_UP_PRESSED (prevInputData & 0b00000001)
+#define PREV_INPUT_UP_PRESSED (prevInputData & 0b00000100)
 #define PREV_INPUT_DOWN_PRESSED (prevInputData & 0b00000010)
-#define PREV_INPUT_LEFT_PRESSED (prevInputData & 0b00000100)
+#define PREV_INPUT_LEFT_PRESSED (prevInputData & 0b00000001)
 #define PREV_INPUT_RIGHT_PRESSED (prevInputData & 0b00001000)
 #define PREV_INPUT_A_PRESSED (prevInputData & 0b00010000)
 #define PREV_INPUT_B_PRESSED (prevInputData & 0b00100000)
