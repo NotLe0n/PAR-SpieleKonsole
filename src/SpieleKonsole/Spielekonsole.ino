@@ -735,8 +735,8 @@ void playMinesweeper() {
 
 	}
 
-	if (INPUT_B_PRESSED) {
-		cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)] |= CELLSTATE_FLAGGED;
+	if (INPUT_B_PRESSED && !PREV_INPUT_B_PRESSED) {
+		cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)] ^= CELLSTATE_FLAGGED; // XOR = toggeln
 	}
 
 	// Zeichne den Zeiger an der neuen position wenn eine Taste losgelassen wurde
@@ -819,15 +819,17 @@ void MineSweeper_drawCell(const uint8_t& cl, const uint8_t& x, const uint8_t& y)
 	if (cl & CELLSTATE_REVEALED) {
 		tft.fillRect(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, MS_CELLSIZE, ILI9341_BLACK);
 
-		// Zeichnet die Box der Zelle
-		if (y - 1 != 255 && !(cells[MS_getIndex(x, y - 1)] & CELLSTATE_REVEALED))
-			tft.drawFastHLine(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, ILI9341_RED);
-		if (y + 1 >= 0 && !(cells[MS_getIndex(x, y + 1)] & CELLSTATE_REVEALED))
-			tft.drawFastHLine(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_CELLSIZE - 1 + MS_YOFFSET, MS_CELLSIZE, ILI9341_RED);
-		if (x - 1 != 255 && !(cells[MS_getIndex(x - 1, y)] & CELLSTATE_REVEALED))
-			tft.drawFastVLine(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, ILI9341_RED);
-		if (x + 1 >= 0 && !(cells[MS_getIndex(x + 1, y)] & CELLSTATE_REVEALED))
-			tft.drawFastVLine(x * MS_CELLSIZE + MS_XOFFSET + MS_CELLSIZE - 1, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, ILI9341_RED);
+		if (!(cl & CELLSTATE_FLAGGED)) {
+			// Zeichnet die Box der Zelle
+			if (y - 1 != 255 && !(cells[MS_getIndex(x, y - 1)] & CELLSTATE_REVEALED))
+				tft.drawFastHLine(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, ILI9341_RED);
+			if (y + 1 >= 0 && !(cells[MS_getIndex(x, y + 1)] & CELLSTATE_REVEALED))
+				tft.drawFastHLine(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_CELLSIZE - 1 + MS_YOFFSET, MS_CELLSIZE, ILI9341_RED);
+			if (x - 1 != 255 && !(cells[MS_getIndex(x - 1, y)] & CELLSTATE_REVEALED))
+				tft.drawFastVLine(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, ILI9341_RED);
+			if (x + 1 >= 0 && !(cells[MS_getIndex(x + 1, y)] & CELLSTATE_REVEALED))
+				tft.drawFastVLine(x * MS_CELLSIZE + MS_XOFFSET + MS_CELLSIZE - 1, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, ILI9341_RED);
+		}
 	}
 	else {
 		tft.fillRect(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, MS_CELLSIZE, 0x4000); // 0x4000 = Dunkelrot
@@ -840,6 +842,10 @@ void MineSweeper_drawCell(const uint8_t& cl, const uint8_t& x, const uint8_t& y)
 			tft.setCursor(x * MS_CELLSIZE + 4 + MS_XOFFSET, y * MS_CELLSIZE + 3 + MS_YOFFSET);
 			tft.print(mines);
 		}
+	}
+
+	if (cl & CELLSTATE_FLAGGED) {
+		tft.drawRect(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, MS_CELLSIZE, ILI9341_YELLOW);
 	}
 }
 
@@ -897,11 +903,11 @@ void playTicTacToe() {
 
 	// A = 1, B = 2
 	// setze einen "X" wenn A gedrückt wurde und auf dem Feld kein "O" ist
-	if (INPUT_A_PRESSED && tictactoeField[TTT_getIndex(TTT_cursorX, TTT_cursorY)] != 2) {
+	if (INPUT_A_PRESSED && !PREV_INPUT_A_PRESSED && tictactoeField[TTT_getIndex(TTT_cursorX, TTT_cursorY)] != 2) {
 		tictactoeField[TTT_getIndex(TTT_cursorX, TTT_cursorY)] = 1;
 	}
 	// setze einen "O" wenn B gedrückt wurde und auf dem Feld kein "X" ist
-	if (INPUT_B_PRESSED && tictactoeField[TTT_getIndex(TTT_cursorX, TTT_cursorY)] != 1) {
+	if (INPUT_B_PRESSED && !PREV_INPUT_B_PRESSED && tictactoeField[TTT_getIndex(TTT_cursorX, TTT_cursorY)] != 1) {
 		tictactoeField[TTT_getIndex(TTT_cursorX, TTT_cursorY)] = 2;
 	}
 
