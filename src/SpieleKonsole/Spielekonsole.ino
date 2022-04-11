@@ -81,31 +81,39 @@ void setup() {
 	analogWrite(TFT_BL, 255); // Bildschirm anschalten
 
 	// Begrüßungsnachricht
-#define SKIPGREETING true // Debug variable um die Begrüßungsnachricht zu überspringen
-#if !SKIPGREETING
 	greeting();
-#endif
 
 	// Interrupt auf den Pin festlegen
 	attachInterrupt(digitalPinToInterrupt(INT_PIN), zumHauptmenu, FALLING);
 }
 
+bool clearScrn = false;
 bool inGame = false;
+bool inSettings = false;
 uint8_t currentGame = NONE;
 
 void loop() {
+	if (clearScrn) {
+		tft.fillScreen(ILI9341_BLACK);
+		clearScrn = false;
+		delay(400);
+	}
+
 	// lese Tasten zustände aus dem Schieberegister und speichere sie in inputData
 	handleInput();
 
 	if (inGame) {
 		playGame(currentGame);
 	}
+	else if (inSettings) {
+		settingsMenu();
+	}
 	else {
 		currentGame = selectGame();
 	}
 
 	// kontrolliere die TFT backlight anhand des LDR pins
-	backlightKontrollieren();
+	controlBacklight();
 }
 
 // Begrüßungsnachricht
@@ -122,7 +130,7 @@ void greeting() {
 }
 
 bool dynamicBacklight = true; // variable um die dynamische Hintergrundbeleuchtung auszuschalten
-void backlightKontrollieren() {
+void controlBacklight() {
 	// wenn die dynamische Hintergrundbeleuchtung ausgeschaltet ist, wird die Backlight auf volle Helligkeit gestellt
 	if (!dynamicBacklight) {
 		analogWrite(TFT_BL, 255);
@@ -131,7 +139,7 @@ void backlightKontrollieren() {
 
 	int wert = analogRead(LDR_PIN) / 4; // analogWrite werte gehen nur von 0-255 während analogRead werte von 0-1023 gehen
 	wert -= wert % 5; // erhöhe werte nur in fünfer schritte
-	wert = min(max(wert, 20), 255); // kleinster wert ist 20, darunter passieren böse dinge; größer wert ist 255
+	wert = min(max(wert, 20), 255); // kleinster wert ist 20, darunter passieren böse dinge; größter wert ist 255
 
 	analogWrite(TFT_BL, wert);
 }
@@ -166,26 +174,27 @@ void handleInput() {
 	}
 }
 
+// Alle Spiele
+const String spiele[] = { "Snake", "Pong", "Minesweeper", "Tic Tac Toe" };
 uint8_t selectedGame = 0; // welches Spiel Ausgewählt wurde
 
 // Wird jeden Loop() durchlauf aufgerufen wenn inGame false ist
 uint8_t selectGame() {
 	if (INPUT_UP_PRESSED && !PREV_INPUT_UP_PRESSED) {
-		selectedGame = uint8_t(--selectedGame) % 4; // verrigere den wert um 1. Halte den wert zwischen 0 und 4
+		if(--selectedGame > 4){ // verrigere den wert um 1. 
+		  selectedGame = 4; //Halte den wert zwischen 0 und 5
+		}
 	}
 	if (INPUT_DOWN_PRESSED && !PREV_INPUT_DOWN_PRESSED) {
-		selectedGame = ++selectedGame % 4; // erhöhe den wert um 1. Halte den wert zwischen 0 und 4. Wenn der wert 5 ist wird er zu 0 gesetzt
+		selectedGame = ++selectedGame % 5; // erhöhe den wert um 1. Halte den wert zwischen 0 und 5. Wenn der wert 6 ist wird er zu 0 gesetzt
 	}
-
-	// Alle Spiele
-	const String spiele[] = { "Snake", "Pong", "Minesweeper", "Tic Tac Toe" };
 
 	// schreibe "Spieleliste"
 	tft.setCursor(0, 0);
 	tft.setTextSize(3);
 	tft.setTextColor(ILI9341_YELLOW);
 	tft.println(F("Spieleliste"));
-
+  
 	// schreibe alle Spiele
 	tft.setTextSize(2);
 	setCursorRelative(0, 10);
@@ -199,11 +208,21 @@ uint8_t selectGame() {
 		tft.println(spiele[i]); // Schreibe das Spiel
 	}
 
+	tft.setTextColor(selectedGame == 4 ? ILI9341_WHITE : ILI9341_DARKGREY);
+	tft.setCursor(160, tft.height() - 20);
+	tft.println(F("Einstellungen"));
+
 	// Wenn 'A' gedrückt wurde
 	if (INPUT_A_PRESSED || INPUT_B_PRESSED) {
-		inGame = true;
-
 		tft.fillScreen(ILI9341_BLACK); // Bildschirm schwarz machen
+
+		if (selectedGame == 4) {
+			inSettings = true;
+			// gehe zu Einstellungen
+			return NONE;
+		}
+
+		inGame = true;
 
 		setupGame(selectedGame + 1); // setup game aufrufen (plus 1 weil arrays von 0 anfangen)
 
@@ -211,6 +230,67 @@ uint8_t selectGame() {
 	}
 
 	return NONE;
+}
+
+const String settings[] = { "Dynamische Backlight: ", "Snake Geschwindigkeit: "};
+uint8_t selectedSetting;
+uint8_t setting_snakeSpeed = 70;
+void settingsMenu() {
+	if (INPUT_UP_PRESSED && !PREV_INPUT_UP_PRESSED) {
+		if (--selectedSetting > 2) { // verrigere den wert um 1. 
+			selectedSetting = 2; //Halte den wert zwischen 0 und 5
+		}
+	}
+	if (INPUT_DOWN_PRESSED && !PREV_INPUT_DOWN_PRESSED) {
+		selectedSetting = ++selectedSetting % 2; // erhöhe den wert um 1. Halte den wert zwischen 0 und 5. Wenn der wert 6 ist wird er zu 0 gesetzt
+	}
+
+	tft.setTextColor(ILI9341_YELLOW);
+	tft.setTextSize(3);
+	tft.setCursor(40, 0);
+	tft.println(F("Einstellungen"));
+
+	tft.setCursor(0, 50);
+	tft.setTextSize(2);
+
+	for (uint8_t i = 0; i < 2; i++)
+	{
+		tft.setTextColor(selectedSetting == i ? ILI9341_WHITE : ILI9341_DARKGREY, ILI9341_BLACK);
+
+		tft.print(settings[i]);
+		if (i == 0) {
+			tft.println(dynamicBacklight ? F("An ") : F("Aus"));
+		}
+		else if (i == 1) {
+			tft.println(setting_snakeSpeed);
+		}
+	}
+
+	if (INPUT_A_PRESSED && !PREV_INPUT_A_PRESSED) {
+		if (selectedSetting == 0) {
+			dynamicBacklight = !dynamicBacklight;
+		}
+
+		if (selectedSetting == 1) {
+			setting_snakeSpeed += 10;
+			if (setting_snakeSpeed > 240) {
+				setting_snakeSpeed = 240;
+			}
+		}
+	}
+
+	if (INPUT_B_PRESSED && !PREV_INPUT_B_PRESSED) {
+		if (selectedSetting == 0) {
+			dynamicBacklight = !dynamicBacklight;
+		}
+
+		if (selectedSetting == 1) {
+			setting_snakeSpeed -= 10;
+			if (setting_snakeSpeed < 10) {
+				setting_snakeSpeed = 10;
+			}
+		}
+	}
 }
 
 // wird aufgerufen wenn ein Spiel in selectGame() ausgewählt wurde
@@ -255,11 +335,11 @@ void playGame(const uint8_t game) {
 	}
 }
 
-// "#pragma region" für Visual Studio IDE, ändert nichts an der funktionsweise
+// "#pragma region" für Visual Studio IDE. Ändert nichts an der funktionsweise
 #pragma region Snake
 
 #define MAX_SNAKE_LENGTH 100 // die Maximale Länge der Schlange
-#define SNAKE_SPEED 180 // die Geschwindigkeit der Schlange
+uint8_t snakeSpeed; // die Geschwindigkeit der Schlange
 position snakeHead; // die Kopfposition der Schlange
 position snakeBody[MAX_SNAKE_LENGTH]; // die Position aller Körperteile der Schlange
 uint8_t snakeLength; // die aktuelle Länge der schlange
@@ -274,6 +354,7 @@ position foodPos; // Position vom Futter
 #define HEAD_SIZE 20 // Größe vom Kopf
 
 void setupSnake() {
+	snakeSpeed = 250 - setting_snakeSpeed;
 	snakeHead = position(0, 20);
 	snakeDir = 3;
 	snakeLength = 0;
@@ -314,7 +395,7 @@ void playSnake() {
 
 	// takt abstand
 	// kein delay() weil sonst Eingaben überspringen werden können
-	if (millis() % SNAKE_SPEED != 0)
+	if (millis() % snakeSpeed != 0)
 		return;
 
 	// entferne das letzte Körpersegment vom Display
@@ -652,11 +733,11 @@ void setupMinesweeper() {
 		cells[i] = 0;
 	}
 
-	drawCells();
+	MS_drawCells();
 }
 
 void playMinesweeper() {
-	// sobalt das erste feld aufgedeckt wurde wird jede sekunde die Variable "time" ausgegeben und erhöht
+	// sobald das erste feld aufgedeckt wurde wird jede sekunde die Variable "time" ausgegeben und erhöht
 	if (!firstClick && millis() % 1000 == 0) {
 		tft.setCursor(70, 0);
 		char str[16]; // text als zeichen array
@@ -669,7 +750,7 @@ void playMinesweeper() {
 		// Zeichne den roten rand
 		tft.drawRect(MS_XOFFSET, MS_YOFFSET, MS_FIELD_SIZE * MS_CELLSIZE, MS_FIELD_SIZE * MS_CELLSIZE, ILI9341_RED);
 		// Entferne den Zeiger
-		MineSweeper_drawCell(cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)], MS_cursorPosX, MS_cursorPosY);
+		MS_drawCell(cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)], MS_cursorPosX, MS_cursorPosY);
 	}
 
 	// ändere Zeigerposition
@@ -703,7 +784,7 @@ void playMinesweeper() {
 	if (INPUT_A_PRESSED) {
 		// Erstelle ein feld wenn A zum ersten mal gedrückt wurde
 		if (firstClick) {
-			generateField();
+			MS_generateField();
 		}
 
 		// Das Spiel endet wenn auf einer Miene A gedrückt wurde
@@ -718,11 +799,11 @@ void playMinesweeper() {
 
 		if (!(cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)] & CELLSTATE_REVEALED)) {
 			cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)] |= CELLSTATE_REVEALED;
-			revealNeighbors(MS_cursorPosX, MS_cursorPosY);
+			MS_revealNeighbors(MS_cursorPosX, MS_cursorPosY);
 		}
 
 		firstClick = false;
-		drawCells();
+		MS_drawCells();
 
 		if (MS_checkWin()) {
 			tft.setTextColor(ILI9341_WHITE);
@@ -732,7 +813,6 @@ void playMinesweeper() {
 			zumHauptmenu();
 			return;
 		}
-
 	}
 
 	if (INPUT_B_PRESSED && !PREV_INPUT_B_PRESSED) {
@@ -746,7 +826,7 @@ void playMinesweeper() {
 }
 
 // generiert ein zufälliges mienenfeld
-void generateField() {
+void MS_generateField() {
 	do {
 		for (uint8_t i = 0; i < MS_FIELD_SIZE * MS_FIELD_SIZE; i++) {
 			cells[i] = 0;
@@ -755,12 +835,11 @@ void generateField() {
 			uint8_t ri = random(0, MS_FIELD_SIZE * MS_FIELD_SIZE - 1);
 			cells[ri] = CELLSTATE_MINE;
 		}
-	} while (countNearbyMines(MS_cursorPosX, MS_cursorPosY) != 0); // erstelle solange ein neues feld bis die Zelle an der position des Zeigers frei ist
+	} while (MS_countNearbyMines(MS_cursorPosX, MS_cursorPosY) != 0); // erstelle solange ein neues feld bis die Zelle an der position des Zeigers frei ist
 }
 
-
 // Zeigt Rekursiv alle Nachbarn einer Zelle
-void revealNeighbors(const uint8_t& posX, const uint8_t& posY) {
+void MS_revealNeighbors(const uint8_t& posX, const uint8_t& posY) {
 	Serial.print(RAMEND - SP);
 	Serial.print(", ");
 
@@ -775,18 +854,17 @@ void revealNeighbors(const uint8_t& posX, const uint8_t& posY) {
 			if ((cells[MS_getIndex(posX + x, posY + y)] & CELLSTATE_MINE) != 0 || (cells[MS_getIndex(posX + x, posY + y)] & CELLSTATE_REVEALED) != 0 || (x == 0 && y == 0))
 				continue;
 			
-			if (countNearbyMines(posX, posY) == 0)
+			if (MS_countNearbyMines(posX, posY) == 0)
 			{
 				cells[MS_getIndex(posX + x, posY + y)] |= CELLSTATE_REVEALED;;
-				revealNeighbors(posX + x, posY + y); // rekursion
-				
+				MS_revealNeighbors(posX + x, posY + y); // rekursion		
 			}
 		}
 	}
 }
 
 // Zählt wie viele Mienen um eine Zelle sind
-uint8_t countNearbyMines(const uint8_t& posX, const uint8_t& posY) {
+uint8_t MS_countNearbyMines(const uint8_t& posX, const uint8_t& posY) {
 	uint8_t count = 0;
 
 	// überprüfe alle felder direkt neben der Zelle
@@ -806,16 +884,16 @@ uint8_t countNearbyMines(const uint8_t& posX, const uint8_t& posY) {
 }
 
 // zeichnet alle Zellen
-void drawCells() {
+void MS_drawCells() {
 	for (uint8_t y = 0; y < MS_FIELD_SIZE; y++) {
 		for (uint8_t x = 0; x < MS_FIELD_SIZE; x++) {
-			MineSweeper_drawCell(cells[MS_getIndex(x, y)], x, y);
+			MS_drawCell(cells[MS_getIndex(x, y)], x, y);
 		}
 	}
 }
 
 // Zeichnet eine zelle
-void MineSweeper_drawCell(const uint8_t& cl, const uint8_t& x, const uint8_t& y) {
+void MS_drawCell(const uint8_t& cl, const uint8_t& x, const uint8_t& y) {
 	if (cl & CELLSTATE_REVEALED) {
 		tft.fillRect(x * MS_CELLSIZE + MS_XOFFSET, y * MS_CELLSIZE + MS_YOFFSET, MS_CELLSIZE, MS_CELLSIZE, ILI9341_BLACK);
 
@@ -837,7 +915,7 @@ void MineSweeper_drawCell(const uint8_t& cl, const uint8_t& x, const uint8_t& y)
 
 	// Zeichne die Anzahl an umgebenden Mienen wenn die Zelle aufgedeckt wurde
 	if (cl & CELLSTATE_REVEALED && !(cl & CELLSTATE_MINE)) {
-		uint8_t mines = countNearbyMines(x, y);
+		uint8_t mines = MS_countNearbyMines(x, y);
 		if (mines != 0) {
 			tft.setCursor(x * MS_CELLSIZE + 4 + MS_XOFFSET, y * MS_CELLSIZE + 3 + MS_YOFFSET);
 			tft.print(mines);
@@ -1023,23 +1101,29 @@ bool TTT_checkFilled() {
 
 #pragma endregion
 
+// __FlashStringHelper* ist der typ der vom "F()" Makro zurückgegeben wird
 void printCentered(const __FlashStringHelper* str) {
+	// die Variablen werden mit den Werten, die die Funktion "getTextBounds()" berechnet gefüllt
 	int16_t boundsX, boundsY;
 	uint16_t boundsW, boundsH;
-	tft.getTextBounds(str, tft.width() / 2, tft.height()  / 2, &boundsX, &boundsY, &boundsW, &boundsH);
-	tft.setCursor((tft.width() - boundsW) / 2, (tft.height() - boundsH) / 2);
+
+	tft.getTextBounds(str, tft.width() / 2, tft.height()  / 2, &boundsX, &boundsY, &boundsW, &boundsH); // &<var> gibt die Adresse der Variable an die Funktion
+	tft.setCursor((tft.width() - boundsW) / 2, (tft.height() - boundsH) / 2); // cursor in die mitte des Bildschirms setzen setzen
 	tft.print(str);
 }
 
 // const <T>& um keine kopie von der variable machen
 void printCentered(const __FlashStringHelper* str, const int16_t& offsetX, const int8_t& offsetY) {
+	// die Variablen werden mit den Werten, die die Funktion "getTextBounds()" berechnet gefüllt
 	int16_t boundsX, boundsY;
 	uint16_t boundsW, boundsH;
+
 	tft.getTextBounds(str, tft.width() / 2, tft.height() / 2, &boundsX, &boundsY, &boundsW, &boundsH);
-	tft.setCursor((tft.width() - boundsW) / 2 + offsetX, (tft.height() - boundsH) / 2 + offsetY);
+	tft.setCursor((tft.width() - boundsW) / 2 + offsetX, (tft.height() - boundsH) / 2 + offsetY); // cursor in die mitte setzen
 	tft.print(str);
 }
 
+// die funktion verschiebt den cursor um den gegebenen x und y wert
 void setCursorRelative(const int16_t& x, const int8_t& y) {
 	tft.setCursor(tft.getCursorX() + x, tft.getCursorY() + y);
 }
@@ -1056,7 +1140,8 @@ bool posarr_contains(position arr[], const uint8_t size, const position& elm) {
 
 // Springt zurück zum Spiel Auswahl menü
 void zumHauptmenu() {
-	tft.fillScreen(ILI9341_BLACK);
+	clearScrn = true;
 	inGame = false;
+	inSettings = false;
 	currentGame = NONE;
 }
