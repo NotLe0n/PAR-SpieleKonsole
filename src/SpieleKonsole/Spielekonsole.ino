@@ -87,16 +87,17 @@ void setup() {
 	attachInterrupt(digitalPinToInterrupt(INT_PIN), zumHauptmenu, FALLING);
 }
 
-bool clearScrn = false;
+volatile bool backToMenu = false;
 bool inGame = false;
-bool inSettings = false;
 uint8_t currentGame = NONE;
 
 void loop() {
-	if (clearScrn) {
+	if (backToMenu) {
 		tft.fillScreen(ILI9341_BLACK);
-		clearScrn = false;
-		delay(400);
+    inGame = false;
+    currentGame = NONE;
+		backToMenu = false;
+		delay(200);
 	}
 
 	// lese Tasten zustände aus dem Schieberegister und speichere sie in inputData
@@ -104,9 +105,6 @@ void loop() {
 
 	if (inGame) {
 		playGame(currentGame);
-	}
-	else if (inSettings) {
-		settingsMenu();
 	}
 	else {
 		currentGame = selectGame();
@@ -129,14 +127,7 @@ void greeting() {
 	tft.fillScreen(ILI9341_BLACK); // Bildschirm schwarz machen
 }
 
-bool dynamicBacklight = true; // variable um die dynamische Hintergrundbeleuchtung auszuschalten
 void controlBacklight() {
-	// wenn die dynamische Hintergrundbeleuchtung ausgeschaltet ist, wird die Backlight auf volle Helligkeit gestellt
-	if (!dynamicBacklight) {
-		analogWrite(TFT_BL, 255);
-		return;
-	}
-
 	int wert = analogRead(LDR_PIN) / 4; // analogWrite werte gehen nur von 0-255 während analogRead werte von 0-1023 gehen
 	wert -= wert % 5; // erhöhe werte nur in fünfer schritte
 	wert = min(max(wert, 20), 255); // kleinster wert ist 20, darunter passieren böse dinge; größter wert ist 255
@@ -181,12 +172,10 @@ uint8_t selectedGame = 0; // welches Spiel Ausgewählt wurde
 // Wird jeden Loop() durchlauf aufgerufen wenn inGame false ist
 uint8_t selectGame() {
 	if (INPUT_UP_PRESSED && !PREV_INPUT_UP_PRESSED) {
-		if(--selectedGame > 4){ // verrigere den wert um 1. 
-		  selectedGame = 4; //Halte den wert zwischen 0 und 5
-		}
+    selectedGame = uint8_t(--selectedGame) % 4; // verrigere den wert um 1. Halte den wert zwischen 0 und 4
 	}
 	if (INPUT_DOWN_PRESSED && !PREV_INPUT_DOWN_PRESSED) {
-		selectedGame = ++selectedGame % 5; // erhöhe den wert um 1. Halte den wert zwischen 0 und 5. Wenn der wert 6 ist wird er zu 0 gesetzt
+		selectedGame = ++selectedGame % 4; // erhöhe den wert um 1. Halte den wert zwischen 0 und 5. Wenn der wert 6 ist wird er zu 0 gesetzt
 	}
 
 	// schreibe "Spieleliste"
@@ -208,19 +197,9 @@ uint8_t selectGame() {
 		tft.println(spiele[i]); // Schreibe das Spiel
 	}
 
-	tft.setTextColor(selectedGame == 4 ? ILI9341_WHITE : ILI9341_DARKGREY);
-	tft.setCursor(160, tft.height() - 20);
-	tft.println(F("Einstellungen"));
-
 	// Wenn 'A' gedrückt wurde
 	if (INPUT_A_PRESSED || INPUT_B_PRESSED) {
 		tft.fillScreen(ILI9341_BLACK); // Bildschirm schwarz machen
-
-		if (selectedGame == 4) {
-			inSettings = true;
-			// gehe zu Einstellungen
-			return NONE;
-		}
 
 		inGame = true;
 
@@ -230,67 +209,6 @@ uint8_t selectGame() {
 	}
 
 	return NONE;
-}
-
-const String settings[] = { "Dynamische Backlight: ", "Snake Geschwindigkeit: "};
-uint8_t selectedSetting;
-uint8_t setting_snakeSpeed = 70;
-void settingsMenu() {
-	if (INPUT_UP_PRESSED && !PREV_INPUT_UP_PRESSED) {
-		if (--selectedSetting > 2) { // verrigere den wert um 1. 
-			selectedSetting = 2; //Halte den wert zwischen 0 und 5
-		}
-	}
-	if (INPUT_DOWN_PRESSED && !PREV_INPUT_DOWN_PRESSED) {
-		selectedSetting = ++selectedSetting % 2; // erhöhe den wert um 1. Halte den wert zwischen 0 und 5. Wenn der wert 6 ist wird er zu 0 gesetzt
-	}
-
-	tft.setTextColor(ILI9341_YELLOW);
-	tft.setTextSize(3);
-	tft.setCursor(40, 0);
-	tft.println(F("Einstellungen"));
-
-	tft.setCursor(0, 50);
-	tft.setTextSize(2);
-
-	for (uint8_t i = 0; i < 2; i++)
-	{
-		tft.setTextColor(selectedSetting == i ? ILI9341_WHITE : ILI9341_DARKGREY, ILI9341_BLACK);
-
-		tft.print(settings[i]);
-		if (i == 0) {
-			tft.println(dynamicBacklight ? F("An ") : F("Aus"));
-		}
-		else if (i == 1) {
-			tft.println(setting_snakeSpeed);
-		}
-	}
-
-	if (INPUT_A_PRESSED && !PREV_INPUT_A_PRESSED) {
-		if (selectedSetting == 0) {
-			dynamicBacklight = !dynamicBacklight;
-		}
-
-		if (selectedSetting == 1) {
-			setting_snakeSpeed += 10;
-			if (setting_snakeSpeed > 240) {
-				setting_snakeSpeed = 240;
-			}
-		}
-	}
-
-	if (INPUT_B_PRESSED && !PREV_INPUT_B_PRESSED) {
-		if (selectedSetting == 0) {
-			dynamicBacklight = !dynamicBacklight;
-		}
-
-		if (selectedSetting == 1) {
-			setting_snakeSpeed -= 10;
-			if (setting_snakeSpeed < 10) {
-				setting_snakeSpeed = 10;
-			}
-		}
-	}
 }
 
 // wird aufgerufen wenn ein Spiel in selectGame() ausgewählt wurde
@@ -354,12 +272,11 @@ position foodPos; // Position vom Futter
 #define HEAD_SIZE 20 // Größe vom Kopf
 
 void setupSnake() {
-	snakeSpeed = 250 - setting_snakeSpeed;
+	snakeSpeed = 180;
 	snakeHead = position(0, 20);
-	snakeDir = 3;
+	snakeDir = RIGHT;
 	snakeLength = 0;
-	for (uint8_t i = 0; i < snakeLength; i++)
-	{
+	for (uint8_t i = 0; i < snakeLength; i++) {
 		snakeBody[i] = {};
 	}
 
@@ -422,8 +339,7 @@ void playSnake() {
 	}
 
 	// körper position ändern
-	for (int i = snakeLength - 1; i >= 0; i--)
-	{
+	for (int i = snakeLength - 1; i >= 0; i--) {
 		if (i == 0) {
 			// das erste Körper segment wird an die Stelle des Kopfes bewegt
 			snakeBody[i] = snakeHead;
@@ -654,8 +570,7 @@ void P_moveBall() {
 		(P_ballPos.Y + P_ballSize >= P_paddle2Y && P_ballPos.Y <= P_paddle2Y + P_paddleHeight);
 
 	// wenn der ball einer der Schläger trifft
-	if (hitPaddle1)
-	{
+	if (hitPaddle1) {
 		P_ballPos.X = 10 + P_paddleWidth; // setze die Position zum rechten rand des 1. Schlägers, sodass der Ball nicht stecken bleibt
 		P_ballVelocityX = -P_ballVelocityX; // spiegle die X geschwindigkeit
 	}
@@ -796,7 +711,7 @@ void playMinesweeper() {
 			zumHauptmenu();
 			return;	
 		}
-
+    
 		if (!(cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)] & CELLSTATE_REVEALED)) {
 			cells[MS_getIndex(MS_cursorPosX, MS_cursorPosY)] |= CELLSTATE_REVEALED;
 			MS_revealNeighbors(MS_cursorPosX, MS_cursorPosY);
@@ -1022,10 +937,8 @@ void playTicTacToe() {
 }
 
 void drawTTTField() {
-	for (uint8_t y = 0; y < 3; y++)
-	{
-		for (uint8_t x = 0; x < 3; x++)
-		{
+	for (uint8_t y = 0; y < 3; y++) {
+		for (uint8_t x = 0; x < 3; x++) {
 			if (tictactoeField[TTT_getIndex(x, y)] == 1) {
 				tft.setCursor(x * TTT_fieldSize + 15 + TTT_offsetX, y * TTT_fieldSize + 12 + TTT_offsetY);
 				tft.setTextColor(ILI9341_RED, ILI9341_BLACK);
@@ -1140,8 +1053,5 @@ bool posarr_contains(position arr[], const uint8_t size, const position& elm) {
 
 // Springt zurück zum Spiel Auswahl menü
 void zumHauptmenu() {
-	clearScrn = true;
-	inGame = false;
-	inSettings = false;
-	currentGame = NONE;
+  backToMenu = true;
 }
