@@ -769,9 +769,8 @@ void MS_revealNeighbors(const uint8_t& posX, const uint8_t& posY) {
 			if ((cells[MS_getIndex(posX + x, posY + y)] & CELLSTATE_MINE) != 0 || (cells[MS_getIndex(posX + x, posY + y)] & CELLSTATE_REVEALED) != 0 || (x == 0 && y == 0))
 				continue;
 			
-			if (MS_countNearbyMines(posX, posY) == 0)
-			{
-				cells[MS_getIndex(posX + x, posY + y)] |= CELLSTATE_REVEALED;;
+			if (MS_countNearbyMines(posX, posY) == 0) {
+				cells[MS_getIndex(posX + x, posY + y)] |= CELLSTATE_REVEALED;
 				MS_revealNeighbors(posX + x, posY + y); // rekursion		
 			}
 		}
