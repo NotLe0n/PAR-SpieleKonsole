@@ -13,5 +13,5 @@ Ich habe mich entschieden eine Spielekonsole zu erstellen.
 
 ![](./docs/img/IMG_20220529_124444%20-%20Kopie.png)
 
-### Die Dokumentation und weitere Bilder liegen im Ordner ["docs"](./docs/).\
-### Den Quelltext kann man [hier](./src/Spielekonsole/Spielekonsole.ino) finden
+### Die Dokumentation und weitere Bilder liegen im Ordner ["docs"](./docs/).
+### Den Quelltext kann man [hier](/src/SpieleKonsole/Spielekonsole.ino) finden
